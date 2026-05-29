@@ -1,0 +1,72 @@
+services:
+  # 🌐 1. High Availability API Web Server Cluster
+  - type: web
+    name: volxen-api-server
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerCommand: gunicorn volxen.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2
+    plan: standard # Provides scalable resources for high-concurrency traffic
+    autoDeploy: true
+    scaling:
+      minInstances: 2   # Ensures multi-zone high availability (Never drops to 0)
+      maxInstances: 50  # Dynamically scales horizontally to absorb flash marketing drops
+      targetCpuPercent: 70
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "volxen-api-server.onrender.com,yourdomain.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: volxen-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: pservice
+          name: volxen-cache
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: PRINTFUL_API_KEY
+        sync: false
+
+  # ⚙️ 2. Distributed Celery Processing Node
+  - type: worker
+    name: volxen-background-worker
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerCommand: celery -A volxen worker --loglevel=info --concurrency=4
+    plan: standard
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: volxen-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: pservice
+          name: volxen-cache
+          property: connectionString
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: PRINTFUL_API_KEY
+        sync: false
+
+# 💾 3. Managed Highly Available Storage Services
+databases:
+  - name: volxen-db
+    plan: standard
+    postgresMajorVersion: "16"
+
+interfaces:
+  - type: pservice
+    name: volxen-cache
+    env: redis
+    plan: standard
+    maxmemoryPolicy: allkeys-lru

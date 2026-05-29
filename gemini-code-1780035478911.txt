@@ -1,0 +1,17 @@
+volxen_store/
+│
+├── volxen/
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── celery.py
+│
+├── store/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── tasks.py
+│   └── views.py
+│
+├── requirements.txt
+├── Dockerfile
+└── render.yaml
